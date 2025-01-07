@@ -1,136 +1,201 @@
-pip install pygame
-import pygame
 import random
+import time
 import sys
 
-# Initialize pygame
-pygame.init()
 
-# Set up display
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Racing Game")
+# Base class for all animals
+class Animal:
+    def __init__(self, name, species, hunger=0, happiness=100):
+        self.name = name
+        self.species = species
+        self.hunger = hunger
+        self.happiness = happiness
 
-# Colors
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
+    def feed(self, food_amount):
+        self.hunger -= food_amount
+        self.happiness += food_amount * 0.2
+        if self.hunger < 0:
+            self.hunger = 0
+        if self.happiness > 100:
+            self.happiness = 100
+        print(f"{self.name} has been fed. Hunger: {self.hunger}, Happiness: {self.happiness}")
 
-# Car and track settings
-CAR_WIDTH = 50
-CAR_HEIGHT = 100
-CAR_SPEED = 5
-CAR_IMAGE = pygame.Surface((CAR_WIDTH, CAR_HEIGHT))
-CAR_IMAGE.fill(RED)
+    def play(self):
+        self.happiness += 10
+        if self.happiness > 100:
+            self.happiness = 100
+        print(f"{self.name} is playing! Happiness: {self.happiness}")
 
-TRACK_WIDTH = 400
-TRACK_BORDER = 50
+    def sleep(self):
+        self.happiness += 5
+        self.hunger += 5
+        if self.happiness > 100:
+            self.happiness = 100
+        if self.hunger > 100:
+            self.hunger = 100
+        print(f"{self.name} is sleeping. Hunger: {self.hunger}, Happiness: {self.happiness}")
 
-# Game clock
-FPS = 60
-clock = pygame.time.Clock()
 
-# Define font
-font = pygame.font.SysFont("Arial", 30)
+# Specific Animal Classes
+class Dog(Animal):
+    def __init__(self, name):
+        super().__init__(name, species="Dog")
 
-# Car class
-class Car(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = CAR_IMAGE
-        self.rect = self.image.get_rect()
-        self.rect.center = (x, y)
-        self.speed = CAR_SPEED
 
-    def update(self, keys):
-        if keys[pygame.K_LEFT] and self.rect.left > TRACK_BORDER:
-            self.rect.x -= self.speed
-        if keys[pygame.K_RIGHT] and self.rect.right < WIDTH - TRACK_BORDER:
-            self.rect.x += self.speed
-        if keys[pygame.K_UP] and self.rect.top > TRACK_BORDER:
-            self.rect.y -= self.speed
-        if keys[pygame.K_DOWN] and self.rect.bottom < HEIGHT - TRACK_BORDER:
-            self.rect.y += self.speed
+class Cat(Animal):
+    def __init__(self, name):
+        super().__init__(name, species="Cat")
 
-# Track class
-class Track(pygame.sprite.Sprite):
+
+class Bird(Animal):
+    def __init__(self, name):
+        super().__init__(name, species="Bird")
+
+
+# Virtual Store Class
+class AnimalStore:
     def __init__(self):
-        super().__init__()
-        self.image = pygame.Surface((WIDTH, HEIGHT))
-        self.image.fill(BLACK)
-        self.rect = self.image.get_rect()
+        self.available_animals = {
+            "dog": Dog("Buddy"),
+            "cat": Cat("Whiskers"),
+            "bird": Bird("Tweety")
+        }
 
-        pygame.draw.rect(self.image, WHITE, [TRACK_BORDER, TRACK_BORDER, WIDTH - 2 * TRACK_BORDER, HEIGHT - 2 * TRACK_BORDER], 10)
+    def show_animals(self):
+        print("Available animals in the store:")
+        for idx, animal in enumerate(self.available_animals.values(), 1):
+            print(f"{idx}. {animal.species} - {animal.name}")
 
-# Obstacle class
-class Obstacle(pygame.sprite.Sprite):
-    def __init__(self, x, y):
-        super().__init__()
-        self.image = pygame.Surface((50, 50))
-        self.image.fill(GREEN)
-        self.rect = self.image.get_rect()
-        self.rect.center = (x, y)
+    def sell_animal(self, choice):
+        animal_names = list(self.available_animals.keys())
+        animal_choice = animal_names[choice - 1]
+        animal = self.available_animals.pop(animal_choice)
+        print(f"You adopted a {animal.species}: {animal.name}")
+        return animal
 
-    def update(self):
-        self.rect.y += 5
-        if self.rect.top > HEIGHT:
-            self.rect.y = -50
-            self.rect.x = random.randint(TRACK_BORDER, WIDTH - TRACK_BORDER)
 
-# Game loop
-def game_loop():
-    running = True
-    car = Car(WIDTH // 2, HEIGHT - 150)
-    track = Track()
+# Player class to interact with the virtual world
+class Player:
+    def __init__(self, name):
+        self.name = name
+        self.animals = []
+        self.money = 100
 
-    all_sprites = pygame.sprite.Group()
-    all_sprites.add(car)
-    all_sprites.add(track)
+    def adopt_animal(self, animal):
+        self.animals.append(animal)
+        print(f"{self.name} has adopted a new {animal.species}: {animal.name}")
 
-    obstacles = pygame.sprite.Group()
-    for i in range(5):
-        obstacle = Obstacle(random.randint(TRACK_BORDER, WIDTH - TRACK_BORDER), random.randint(-100, -50))
-        all_sprites.add(obstacle)
-        obstacles.add(obstacle)
+    def feed_all(self, food_amount):
+        for animal in self.animals:
+            animal.feed(food_amount)
 
-    score = 0
-    start_ticks = pygame.time.get_ticks()
+    def play_with_all(self):
+        for animal in self.animals:
+            animal.play()
 
-    while running:
-        # Handle events
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+    def sleep_all(self):
+        for animal in self.animals:
+            animal.sleep()
 
-        # Update
-        keys = pygame.key.get_pressed()
-        car.update(keys)
-        obstacles.update()
 
-        # Check collision
-        if pygame.sprite.spritecollide(car, obstacles, False):
-            running = False
+# Game Menu System
+class Game:
+    def __init__(self):
+        self.player = None
+        self.store = AnimalStore()
 
-        # Draw
-        screen.fill(BLACK)
-        all_sprites.draw(screen)
+    def start_game(self):
+        print("Welcome to Virtual Pet World!")
+        player_name = input("What is your name, player? ")
+        self.player = Player(player_name)
+        self.main_menu()
 
-        # Display score
-        seconds = (pygame.time.get_ticks() - start_ticks) // 1000
-        score = seconds
-        score_text = font.render(f"Time: {score}s", True, WHITE)
-        screen.blit(score_text, (10, 10))
+    def main_menu(self):
+        while True:
+            print(f"\n{self.player.name}'s Pet World")
+            print("1. View your animals")
+            print("2. Visit Animal Store")
+            print("3. Feed all animals")
+            print("4. Play with all animals")
+            print("5. Let all animals sleep")
+            print("6. Exit Game")
 
-        # Refresh screen
-        pygame.display.flip()
+            choice = input("Choose an option: ")
 
-        # Cap the frame rate
-        clock.tick(FPS)
+            if choice == "1":
+                self.view_animals()
+            elif choice == "2":
+                self.visit_animal_store()
+            elif choice == "3":
+                self.feed_all_animals()
+            elif choice == "4":
+                self.play_with_all_animals()
+            elif choice == "5":
+                self.sleep_all_animals()
+            elif choice == "6":
+                self.exit_game()
+                break
+            else:
+                print("Invalid choice, please try again.")
 
-    pygame.quit()
-    sys.exit()
+    def view_animals(self):
+        if not self.player.animals:
+            print(f"{self.player.name}, you don't have any animals yet!")
+            return
+        print(f"\n{self.player.name}'s Animals:")
+        for idx, animal in enumerate(self.player.animals, 1):
+            print(f"{idx}. {animal.species} - {animal.name}, Hunger: {animal.hunger}, Happiness: {animal.happiness}")
 
+    def visit_animal_store(self):
+        print("\nWelcome to the Animal Store!")
+        self.store.show_animals()
+        choice = input("Enter the number of the animal you want to adopt, or 'q' to return: ")
+
+        if choice == 'q':
+            return
+
+        if choice.isdigit():
+            choice = int(choice)
+            if 1 <= choice <= len(self.store.available_animals):
+                animal = self.store.sell_animal(choice)
+                self.player.adopt_animal(animal)
+            else:
+                print("Invalid choice, returning to the main menu.")
+        else:
+            print("Invalid input, returning to the main menu.")
+
+    def feed_all_animals(self):
+        if not self.player.animals:
+            print("You don't have any animals to feed!")
+            return
+
+        food_amount = int(input("How much food do you want to give to each animal? "))
+        self.player.feed_all(food_amount)
+
+    def play_with_all_animals(self):
+        if not self.player.animals:
+            print("You don't have any animals to play with!")
+            return
+
+        self.player.play_with_all()
+
+    def sleep_all_animals(self):
+        if not self.player.animals:
+            print("You don't have any animals to sleep!")
+            return
+
+        self.player.sleep_all()
+
+    def exit_game(self):
+        print(f"Goodbye {self.player.name}! Thanks for playing the Virtual Pet World!")
+        sys.exit()
+
+
+# Main Game Loop
 if __name__ == "__main__":
-    game_loop()
+    game = Game()
+    game.start_game()
+
+
+
+  
